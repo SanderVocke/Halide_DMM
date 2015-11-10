@@ -10,7 +10,7 @@
 #define N 2144
 #define M 2144
 
-#define IN_NAME "test_im_med.pgm"
+#define IN_NAME "./../test_im_med.pgm"
 #define OUT_NAME "test.out.pgm"
 #define OUT_NAME1 "test.out1.pgm"	// only used for output of temporary images
 #define OUT_NAME2 "test.out2.pgm"	// idem
