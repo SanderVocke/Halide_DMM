@@ -41,6 +41,8 @@ using namespace Halide;
 	#error Dit mag niet!
 #endif
 
+  
+
 
 int getint(FILE *fp) /* adapted from "xv" source code */
 {
@@ -269,25 +271,73 @@ int main(int argc, char **argv)
 
   printf("  Reading image from disk (%s)...\n",IN_NAME);
   read_image((char*)IN_NAME,in_image);
-
   printf("  Computing (GB=%d)...\n",GB);
 
-  Image<int32_t> in_image_halide(
-    2144, 2144, "in_image_halide"
-  );
+   
+
+  int tot=0;
+  for (int k=-GB; k<=GB; ++k) tot+=Gauss[abs(k)];
+
+//HALIDE PORTION
+
+  Image<int32_t> in_image_halide(N,M);
+  Image<int32_t> g_image_halide(N,M);
+  Image<int32_t> c_image_halide(N,M);
+  Image<int32_t> out_image_halide(N,M);
 
   for(int i=0; i<N; i++)
     for(int j=0; j<M; j++)
       in_image_halide(i,j) = in_image[i][j];
 
-  Func copy;
   Var x,y;
-  Expr value = in_image_halide(x,y);
-  copy(x,y) = value;
+  
+  Expr clamped_x = clamp(x,0,N-1);
+  Expr clamped_y = clamp(y,0,M-1);
+ 
+  //GAUSS
+  Func clamped_in;
+  clamped_in(x,y) = in_image_halide(clamped_x, clamped_y);
+  Func gauss;
+  gauss(x,y) = 0;
+  for(int i=-GB; i<GB; i++){
+    gauss(x,y) = gauss(x,y) + clamped_in(x+i,y)*Gauss[abs(i)];
+  }
+  for(int i=-GB; i<GB; i++){
+    gauss(x,y) = gauss(x,y) + clamped_in(x,y+i)*Gauss[abs(i)];
+  }
+  gauss(x,y) = gauss(x,y) / tot;
+  //END GAUSS
+
+  //EDGE
+  Func clamped_gauss;
+  clamped_gauss(x,y) = gauss(clamped_x, clamped_y);
+  Func edge;
+  edge(x,y) = 0;
+  for(int x_offset=-NB; x_offset<NB; x_offset++)
+    for(int y_offset=-NB; y_offset<NB; y_offset++){
+    edge(x,y) = max(abs(clamped_gauss(x,y)-clamped_gauss(x+x_offset,y+y_offset)),edge(x,y));
+  }
+  //END EDGE
+
+  //ROOTS
+  Func clamped_edge;
+  clamped_edge(x,y) = edge(clamped_x, clamped_y);
+  Func roots;
+  roots(x,y) = cast<int32_t>(1);
+  for(int x_offset=-NB; x_offset<NB; x_offset++)
+    for(int y_offset=-NB; y_offset<NB; y_offset++){
+    roots(x,y) = min(roots(x,y), cast<int32_t>(clamped_edge(x+x_offset, y+y_offset)<clamped_edge(x,y)));
+  }
+  roots(x,y) = roots(x,y) * cast<int32_t>(255);
+  //END ROOTS
 
   starttime=clock();
 
-  Image<int32_t> out_image_halide = copy.realize(2144, 2144);
+  gauss.compute_root();
+  edge.compute_root();
+  out_image_halide = roots.realize(2144, 2144);
+
+//END HALIDE PORTION
 
 /*
     GaussBlur(in_image, g_image);
