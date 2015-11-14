@@ -294,48 +294,66 @@ int main(int argc, char **argv)
   Expr clamped_x = clamp(x,0,N-1);
   Expr clamped_y = clamp(y,0,M-1);
  
+  //GAUSS coefficients
+  Func coeff;  
+  coeff(x) = 0;
+  for(int i=0; i<=2*GB; i++){
+	coeff(i) = Gauss[abs(i-GB)];
+  }
+  Image<int32_t> coeff_image_halide(2*GB+1);
+  coeff_image_halide = coeff.realize(2*GB+1); //pre-store the gauss coefficients in an "image"
+  //END GAUSS coefficients
+ 
   //GAUSS
-  Func clamped_in;
-  clamped_in(x,y) = in_image_halide(clamped_x, clamped_y);
-  Func gauss;
-  gauss(x,y) = 0;
-  for(int i=-GB; i<GB; i++){
-    gauss(x,y) = gauss(x,y) + clamped_in(x+i,y)*Gauss[abs(i)];
-  }
-  for(int i=-GB; i<GB; i++){
-    gauss(x,y) = gauss(x,y) + clamped_in(x,y+i)*Gauss[abs(i)];
-  }
-  gauss(x,y) = gauss(x,y) / tot;
+  Func clamped_in; //this is to enforce a boundary condition.
+  clamped_in(x,y) = in_image_halide(clamped_x, clamped_y); //this is to enforce a boundary condition.
+  Func gaussx, gauss;
+  RDom r_gauss(0, 2*GB+1); //addition domain relative to a point
+  gauss(x,y) = 0;  
+  gaussx(x,y) += clamped_in(x+r_gauss-GB, y)*coeff_image_halide(r_gauss);
+  gaussx(x,y) /= tot;
+  Func clamped_gaussx;
+  clamped_gaussx(x,y) = gaussx(clamped_x, clamped_y);
+  gauss(x,y) += clamped_gaussx(x, y+r_gauss-GB)*coeff_image_halide(r_gauss);
+  gauss(x,y) /= tot;
   //END GAUSS
 
   //EDGE
-  Func clamped_gauss;
-  clamped_gauss(x,y) = gauss(clamped_x, clamped_y);
+  Func clamped_gauss; //this is to enforce a boundary condition.
+  clamped_gauss(x,y) = gauss(clamped_x, clamped_y); //this is to enforce a boundary condition.
   Func edge;
+  RDom r_edge(-NB, NB-1, -NB, NB-1); //edge domain
   edge(x,y) = 0;
-  for(int x_offset=-NB; x_offset<NB; x_offset++)
-    for(int y_offset=-NB; y_offset<NB; y_offset++){
-    edge(x,y) = max(abs(clamped_gauss(x,y)-clamped_gauss(x+x_offset,y+y_offset)),edge(x,y));
-  }
+  edge(x,y) = max(edge(x,y), abs(clamped_gauss(x,y)-clamped_gauss(x+r_edge.x,y+r_edge.y)));
   //END EDGE
 
   //ROOTS
-  Func clamped_edge;
-  clamped_edge(x,y) = edge(clamped_x, clamped_y);
+  Func clamped_edge; //this is to enforce a boundary condition.
+  clamped_edge(x,y) = edge(clamped_x, clamped_y); //this is to enforce a boundary condition.
   Func roots;
+  RDom r_roots(-NB, NB-1, -NB, NB-1); //roots domain
   roots(x,y) = cast<int32_t>(1);
-  for(int x_offset=-NB; x_offset<NB; x_offset++)
-    for(int y_offset=-NB; y_offset<NB; y_offset++){
-    roots(x,y) = min(roots(x,y), cast<int32_t>(clamped_edge(x+x_offset, y+y_offset)<clamped_edge(x,y)));
-  }
-  roots(x,y) = roots(x,y) * cast<int32_t>(255);
+  roots(x,y) -= select(
+	clamped_edge(x+r_roots.x, y+r_roots.y)<clamped_edge(x,y),
+	0,
+	1
+  );
+  roots(x,y) = select(
+    roots(x,y) > 0,
+	255,
+	0
+  );
   //END ROOTS
 
   starttime=clock();
 
-  gauss.compute_root();
-  edge.compute_root();
-  out_image_halide = roots.realize(2144, 2144);
+  //SCHEDULE
+  //gauss.compute_root(); //do complete gauss calculation...
+  //edge.compute_root(); //then complete edge calculation...
+  //out_image_halide = roots.realize(2144, 2144); //then roots calculation.
+  gaussx.compute_root();
+  out_image_halide = gauss.realize(2144, 2144);
+  //END SCHEDULE
 
 //END HALIDE PORTION
 

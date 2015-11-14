@@ -26,4 +26,4 @@ clean:
 distclean: clean
 
 run: 
-	LD_LIBRARY_PATH=. ./$(program_NAME)
+	LD_LIBRARY_PATH=~/Halide/bin ./$(program_NAME)

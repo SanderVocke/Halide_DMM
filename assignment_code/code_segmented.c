@@ -880,7 +880,7 @@ int main(int argc, char* argv[])
 
 	printf("  Writing results to disk (%s)...\n",OUT_NAME);
 	write_image(OUT_NAME1,g_image);
-	//write_image(OUT_NAME2,c_image);
+	write_image(OUT_NAME2,c_image);
 	write_image(OUT_NAME,out_image);
 
 	printf("  Elapsed time (without disk reading & writing) is %f s\n",
