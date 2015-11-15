@@ -322,9 +322,9 @@ int main(int argc, char **argv)
   Func clamped_gauss; //this is to enforce a boundary condition.
   clamped_gauss(x,y) = gauss(clamped_x, clamped_y); //this is to enforce a boundary condition.
   Func edge;
-  RDom r_edge(-NB, NB-1, -NB, NB-1); //edge domain
+  RDom r_edge(0, 2*NB+1, 0, 2*NB+1); //edge domain
   edge(x,y) = 0;
-  edge(x,y) = max(edge(x,y), abs(clamped_gauss(x,y)-clamped_gauss(x+r_edge.x,y+r_edge.y)));
+  edge(x,y) = max(edge(x,y), abs(clamped_gauss(x,y)-clamped_gauss(x+r_edge.x-NB,y+r_edge.y-NB)));
   //END EDGE
 
   //ROOTS
@@ -352,7 +352,8 @@ int main(int argc, char **argv)
   //edge.compute_root(); //then complete edge calculation...
   //out_image_halide = roots.realize(2144, 2144); //then roots calculation.
   gaussx.compute_root();
-  out_image_halide = gauss.realize(2144, 2144);
+  gauss.compute_root();
+  out_image_halide = edge.realize(2144, 2144);
   //END SCHEDULE
 
 //END HALIDE PORTION
