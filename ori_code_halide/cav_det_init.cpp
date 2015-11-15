@@ -331,15 +331,15 @@ int main(int argc, char **argv)
   Func clamped_edge; //this is to enforce a boundary condition.
   clamped_edge(x,y) = edge(clamped_x, clamped_y); //this is to enforce a boundary condition.
   Func roots;
-  RDom r_roots(-NB, NB-1, -NB, NB-1); //roots domain
-  roots(x,y) = cast<int32_t>(1);
-  roots(x,y) -= select(
-	clamped_edge(x+r_roots.x, y+r_roots.y)<clamped_edge(x,y),
-	0,
-	1
+  RDom r_roots(0, 2*NB+1, 0, 2*NB+1); //roots domain
+  roots(x,y) = 0;
+  roots(x,y) += select(
+	clamped_edge(x+r_roots.x-NB, y+r_roots.y-NB)<clamped_edge(x,y),
+	1,
+	0
   );
   roots(x,y) = select(
-    roots(x,y) > 0,
+    (roots(x,y)==0),
 	255,
 	0
   );
@@ -348,21 +348,13 @@ int main(int argc, char **argv)
   starttime=clock();
 
   //SCHEDULE
-  //gauss.compute_root(); //do complete gauss calculation...
-  //edge.compute_root(); //then complete edge calculation...
-  //out_image_halide = roots.realize(2144, 2144); //then roots calculation.
   gaussx.compute_root();
   gauss.compute_root();
-  out_image_halide = edge.realize(2144, 2144);
+  edge.compute_root();
+  out_image_halide = roots.realize(2144, 2144);
   //END SCHEDULE
 
 //END HALIDE PORTION
-
-/*
-    GaussBlur(in_image, g_image);
-    ComputeEdges(g_image, c_image);
-    DetectRoots(c_image, out_image);
-*/
 
   endtime=clock();  
 
